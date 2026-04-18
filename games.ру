@@ -1,0 +1,53 @@
+# games.py
+import random
+
+def play_dice():
+    return random.randint(1, 6)
+
+def play_rps(user_choice):
+    choices = ['камень', 'ножницы', 'бумага']
+    bot_choice = random.choice(choices)
+    if user_choice == bot_choice:
+        return bot_choice, 'draw', 0
+    elif (user_choice == 'камень' and bot_choice == 'ножницы') or \
+         (user_choice == 'ножницы' and bot_choice == 'бумага') or \
+         (user_choice == 'бумага' and bot_choice == 'камень'):
+        return bot_choice, 'win', 15
+    else:
+        return bot_choice, 'lose', -10
+
+def play_slots(bet):
+    symbols = ['🍒', '🍋', '🍊', '🍉', '🔔', '💎', '7️⃣']
+    spin = [random.choice(symbols) for _ in range(3)]
+    if spin[0] == spin[1] == spin[2]:
+        if spin[0] == '💎':
+            win = bet * 10
+        elif spin[0] == '7️⃣':
+            win = bet * 5
+        else:
+            win = bet * 2
+        return spin, win
+    elif spin[0] == spin[1] or spin[1] == spin[2] or spin[0] == spin[2]:
+        return spin, bet
+    else:
+        return spin, -bet
+
+def calculate_duel_damage(action, is_defending=False):
+    if action == 'attack':
+        return random.randint(15, 30)
+    elif action == 'defend':
+        return random.randint(5, 15)
+    else:  # heal
+        return random.randint(15, 30)
+
+def check_winner(board):
+    wins = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
+    for a,b,c in wins:
+        if board[a] == board[b] == board[c] and board[a] != '-':
+            return board[a]
+    if '-' not in board:
+        return 'draw'
+    return None
+
+def print_board(board):
+    return f"┌───┬───┬───┐\n│ {board[0]} │ {board[1]} │ {board[2]} │\n├───┼───┼───┤\n│ {board[3]} │ {board[4]} │ {board[5]} │\n├───┼───┼───┤\n│ {board[6]} │ {board[7]} │ {board[8]} │\n└───┴───┴───┘"
