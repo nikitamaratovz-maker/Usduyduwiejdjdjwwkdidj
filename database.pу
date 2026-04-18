@@ -1,0 +1,152 @@
+# database.py
+import sqlite3
+import json
+import threading
+from datetime import datetime, timedelta
+
+conn = sqlite3.connect('bot_data.db', check_same_thread=False)
+cursor = conn.cursor()
+db_lock = threading.RLock()
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY,
+    username TEXT,
+    first_name TEXT,
+    registered_date TEXT,
+    messages_count INTEGER DEFAULT 0,
+    xp INTEGER DEFAULT 0,
+    level INTEGER DEFAULT 1,
+    coins INTEGER DEFAULT 100,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    draws INTEGER DEFAULT 0,
+    elo_rating INTEGER DEFAULT 1000,
+    last_daily TEXT,
+    daily_streak INTEGER DEFAULT 0,
+    inventory TEXT DEFAULT '{}'
+)
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS chat_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    role TEXT,
+    content TEXT,
+    date TEXT
+)
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS duels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    challenger_id INTEGER,
+    opponent_id INTEGER,
+    challenger_hp INTEGER DEFAULT 100,
+    opponent_hp INTEGER DEFAULT 100,
+    turn INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'waiting',
+    created_date TEXT
+)
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS tictactoe (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player1_id INTEGER,
+    player2_id INTEGER,
+    board TEXT DEFAULT '---------',
+    turn INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'waiting',
+    created_date TEXT
+)
+''')
+
+conn.commit()
+
+def get_user(user_id):
+    with db_lock:
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row:
+            return {
+                'user_id': row[0], 'username': row[1], 'first_name': row[2],
+                'registered_date': row[3], 'messages_count': row[4], 'xp': row[5],
+                'level': row[6], 'coins': row[7], 'wins': row[8], 'losses': row[9],
+                'draws': row[10], 'elo_rating': row[11], 'last_daily': row[12],
+                'daily_streak': row[13], 'inventory': json.loads(row[14]) if row[14] else {}
+            }
+        return None
+
+def create_user(user_id, username, first_name):
+    with db_lock:
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        if cursor.fetchone():
+            return get_user(user_id)
+        now = datetime.now().isoformat()
+        cursor.execute('''
+            INSERT INTO users (user_id, username, first_name, registered_date)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, username, first_name, now))
+        conn.commit()
+        return get_user(user_id)
+
+def update_user(user_id, **kwargs):
+    with db_lock:
+        for key, value in kwargs.items():
+            if key == 'inventory':
+                value = json.dumps(value)
+            cursor.execute(f"UPDATE users SET {key} = ? WHERE user_id = ?", (value, user_id))
+        conn.commit()
+
+def add_xp(user_id, amount):
+    user = get_user(user_id)
+    if not user: return
+    new_xp = user['xp'] + amount
+    new_level = user['level']
+    xp_needed = user['level'] * 100
+    while new_xp >= xp_needed:
+        new_xp -= xp_needed
+        new_level += 1
+        update_user(user_id, coins=user['coins'] + 50)
+        xp_needed = new_level * 100
+    update_user(user_id, xp=new_xp, level=new_level)
+
+def update_elo(winner_elo, loser_elo, k=32):
+    expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
+    expected_loser = 1 / (1 + 10 ** ((winner_elo - loser_elo) / 400))
+    new_winner = winner_elo + k * (1 - expected_winner)
+    new_loser = loser_elo + k * (0 - expected_loser)
+    return int(new_winner), int(new_loser)
+
+def save_message_history(user_id, role, content):
+    with db_lock:
+        now = datetime.now().isoformat()
+        cursor.execute('''
+            INSERT INTO chat_history (user_id, role, content, date)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, role, content, now))
+        conn.commit()
+        month_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        cursor.execute("DELETE FROM chat_history WHERE date < ?", (month_ago,))
+        conn.commit()
+
+def get_chat_history(user_id, limit=20):
+    with db_lock:
+        cursor.execute('''
+            SELECT role, content FROM chat_history
+            WHERE user_id = ? ORDER BY date DESC LIMIT ?
+        ''', (user_id, limit))
+        rows = cursor.fetchall()
+        return [{"role": row[0], "content": row[1]} for row in reversed(rows)]
+
+def get_top_by_elo(limit=10):
+    with db_lock:
+        cursor.execute("SELECT user_id, username, elo_rating FROM users ORDER BY elo_rating DESC LIMIT ?", (limit,))
+        return cursor.fetchall()
+
+def get_top_by_level(limit=10):
+    with db_lock:
+        cursor.execute("SELECT user_id, username, level, xp FROM users ORDER BY level DESC, xp DESC LIMIT ?", (limit,))
+        return cursor.fetchall()
