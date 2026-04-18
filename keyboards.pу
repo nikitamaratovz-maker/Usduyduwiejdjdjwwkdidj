@@ -1,0 +1,56 @@
+# keyboards.py
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+
+def get_main_keyboard():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    buttons = [
+        KeyboardButton("🎮 ИГРЫ"),
+        KeyboardButton("👤 ПРОФИЛЬ"),
+        KeyboardButton("💰 ЕЖЕДНЕВНЫЙ БОНУС"),
+        KeyboardButton("🏆 РЕЙТИНГ"),
+        KeyboardButton("🎰 КАЗИНО"),
+        KeyboardButton("❓ ПОМОЩЬ")
+    ]
+    markup.add(*buttons)
+    return markup
+
+def get_games_keyboard():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    buttons = [
+        KeyboardButton("🎲 КУБИК"),
+        KeyboardButton("✂️ КНБ"),
+        KeyboardButton("🎰 СЛОТЫ"),
+        KeyboardButton("⚔️ ДУЭЛЬ С БОТОМ"),
+        KeyboardButton("👥 ДУЭЛЬ С ДРУГОМ"),
+        KeyboardButton("❌ КРЕСТИКИ-НОЛИКИ"),
+        KeyboardButton("◀️ НАЗАД")
+    ]
+    markup.add(*buttons)
+    return markup
+
+def get_duel_bot_keyboard():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    buttons = [
+        KeyboardButton("⚔️ АТАКОВАТЬ"),
+        KeyboardButton("🛡️ ЗАЩИТАТЬСЯ"),
+        KeyboardButton("💊 ЛЕЧЕНИЕ"),
+        KeyboardButton("◀️ НАЗАД")
+    ]
+    markup.add(*buttons)
+    return markup
+
+def get_back_keyboard():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("◀️ НАЗАД"))
+    return markup
+
+def create_ttt_keyboard(game_id, board, current_turn):
+    markup = InlineKeyboardMarkup(row_width=3)
+    buttons = []
+    for i in range(9):
+        if board[i] == '-':
+            buttons.append(InlineKeyboardButton("⬜", callback_data=f"ttt_{game_id}_{i}"))
+        else:
+            buttons.append(InlineKeyboardButton(board[i], callback_data="noop"))
+    markup.add(*buttons)
+    return markup
